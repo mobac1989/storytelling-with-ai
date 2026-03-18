@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useScroll, useSpring } from 'motion/react';
 import { 
   Sparkles, 
   Users, 
@@ -256,6 +256,13 @@ const AccordionItem = ({
 };
 
 export default function App() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001
+  });
+
   const [formStatus, setFormStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [openAccordionIndex, setOpenAccordionIndex] = useState<number | null>(null);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
@@ -346,6 +353,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white text-black selection:bg-neon-pink selection:text-white font-sans overflow-x-hidden">
+      {/* Scroll Progress Indicator */}
+      <div className="fixed top-0 left-0 right-0 h-[3px] bg-black/5 z-[100]">
+        <motion.div
+          className="h-full bg-neon-pink origin-right"
+          style={{ scaleX }}
+        />
+      </div>
+
       {/* Hero Section */}
       <section className="relative min-h-screen flex flex-col items-center justify-center px-6 md:pl-12 md:pr-36 overflow-hidden py-12 md:py-0">
         
@@ -406,7 +421,7 @@ export default function App() {
                     ולהפוך אותו לסצנה בעזרת בינה מלאכותית.
                   </p>
                 </div>
-                <CTAButton>הבטיחו מקום</CTAButton>
+                <CTAButton>לשמוע עוד על הקורס</CTAButton>
               </div>
             </motion.div>
           </div>
