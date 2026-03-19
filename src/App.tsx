@@ -18,8 +18,220 @@ import {
   Send,
   Plus,
   Minus,
-  X
+  X,
+  Lock,
+  LogOut,
+  Trash2,
+  RefreshCw,
+  Mail,
+  Phone,
+  User as UserIcon,
+  MessageSquare,
+  Calendar
 } from 'lucide-react';
+import { saveLead, signInWithGoogle, logout, onAuthChange, getLeads, deleteLead, User } from './firebase';
+
+const ADMIN_EMAILS = ["mobac89@gmail.com", "moti.bachar@buildots.com"];
+
+const AdminDashboard = ({ onClose }: { onClose: () => void }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthChange((u) => {
+      setUser(u);
+      if (u && ADMIN_EMAILS.includes(u.email || '')) {
+        fetchLeads();
+      } else {
+        setLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const fetchLeads = async () => {
+    setLoading(true);
+    try {
+      const data = await getLeads();
+      setLeads(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    setIsAuthenticating(true);
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('האם אתה בטוח שברצונך למחוק את הליד הזה?')) {
+      try {
+        await deleteLead(id);
+        setLeads(leads.filter(l => l.id !== id));
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  };
+
+  if (loading && user && ADMIN_EMAILS.includes(user.email || '')) {
+    return (
+      <div className="fixed inset-0 bg-white z-[200] flex items-center justify-center">
+        <RefreshCw className="animate-spin text-neon-pink" size={48} />
+      </div>
+    );
+  }
+
+  if (!user || !ADMIN_EMAILS.includes(user.email || '')) {
+    return (
+      <div className="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-6 text-center">
+        <button onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-black/5 rounded-full transition-colors">
+          <X size={24} />
+        </button>
+        <div className="w-20 h-20 bg-neon-pink/10 rounded-full flex items-center justify-center mb-8">
+          <Lock className="text-neon-pink" size={40} />
+        </div>
+        <h2 className="text-3xl font-black mb-4 tracking-tighter">אזור ניהול סודי</h2>
+        <p className="text-lg font-light opacity-60 mb-8 max-w-md">
+          הגישה לדף זה מוגבלת למנהלי המערכת בלבד. אנא התחבר עם חשבון הגוגל המורשה.
+        </p>
+        <button 
+          onClick={handleLogin}
+          disabled={isAuthenticating}
+          className="px-8 py-4 bg-black text-white font-bold flex items-center gap-3 hover:bg-neon-pink transition-colors disabled:opacity-50"
+        >
+          {isAuthenticating ? <RefreshCw className="animate-spin" size={20} /> : <Smile size={20} />}
+          התחברות עם Google
+        </button>
+        {user && !ADMIN_EMAILS.includes(user.email || '') && (
+          <p className="mt-6 text-red-500 font-bold">
+            החשבון {user.email} אינו מורשה לגשת לדף זה.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-[#f9f9f9] z-[200] overflow-y-auto">
+      <div className="max-w-6xl mx-auto px-6 py-12">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 border-b border-black/10 pb-8">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-[10px] font-bold tracking-[0.5em] uppercase opacity-40">Dashboard</span>
+              <div className="h-[1px] w-8 bg-black/20" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tighter">ניהול לידים</h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={fetchLeads}
+              className="p-3 bg-white border border-black/10 hover:border-neon-pink transition-colors rounded-full"
+              title="רענן"
+            >
+              <RefreshCw size={20} />
+            </button>
+            <button 
+              onClick={logout}
+              className="px-6 py-3 bg-white border border-black font-bold hover:bg-black hover:text-white transition-all flex items-center gap-2"
+            >
+              <LogOut size={18} />
+              התנתק
+            </button>
+            <button 
+              onClick={onClose}
+              className="p-3 bg-black text-white hover:bg-neon-pink transition-colors rounded-full"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-6">
+          {leads.length === 0 ? (
+            <div className="bg-white border border-black/10 p-20 text-center">
+              <p className="text-xl font-light opacity-40">עדיין אין לידים במערכת.</p>
+            </div>
+          ) : (
+            leads.map((lead) => (
+              <motion.div 
+                key={lead.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white border border-black/10 p-6 md:p-8 hover:shadow-xl transition-all group relative"
+              >
+                <button 
+                  onClick={() => handleDelete(lead.id)}
+                  className="absolute top-6 left-6 p-2 text-black/20 hover:text-red-500 transition-colors"
+                  title="מחק ליד"
+                >
+                  <Trash2 size={20} />
+                </button>
+
+                <div className="grid md:grid-cols-4 gap-8">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 opacity-40 mb-1">
+                      <UserIcon size={14} />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">שם מלא</span>
+                    </div>
+                    <p className="text-xl font-bold">{lead.name}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 opacity-40 mb-1">
+                      <Mail size={14} />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">אימייל</span>
+                    </div>
+                    <a href={`mailto:${lead.email}`} className="text-lg font-light hover:text-neon-pink transition-colors">{lead.email}</a>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 opacity-40 mb-1">
+                      <Phone size={14} />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">טלפון</span>
+                    </div>
+                    <p className="text-lg font-light">{lead.phone || 'לא צוין'}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 opacity-40 mb-1">
+                      <Calendar size={14} />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">תאריך</span>
+                    </div>
+                    <p className="text-lg font-light">
+                      {lead.timestamp?.toDate ? lead.timestamp.toDate().toLocaleString('he-IL') : new Date(lead.createdAt).toLocaleString('he-IL')}
+                    </p>
+                  </div>
+                </div>
+
+                {lead.message && (
+                  <div className="mt-8 pt-6 border-t border-black/5">
+                    <div className="flex items-center gap-2 opacity-40 mb-2">
+                      <MessageSquare size={14} />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">הודעה</span>
+                    </div>
+                    <p className="text-lg font-light leading-relaxed opacity-80">{lead.message}</p>
+                  </div>
+                )}
+              </motion.div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const FadeIn = ({ children, delay = 0 }: { children: React.ReactNode; delay?: number; key?: React.Key }) => (
   <motion.div
@@ -267,6 +479,7 @@ export default function App() {
   const [openAccordionIndex, setOpenAccordionIndex] = useState<number | null>(null);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [showFloatingCTA, setShowFloatingCTA] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -322,31 +535,17 @@ export default function App() {
       return;
     }
     
-    // Add FormSubmit specific fields
-    formData.append('_subject', "פנייה חדשה מהאתר: " + (formData.get('name') || 'ללא שם'));
-    formData.append('_template', 'table');
-    formData.append('_captcha', 'false');
+    const name = formData.get('name') as string;
+    const email = formData.get('email') as string;
+    const phone = formData.get('phone') as string;
+    const message = formData.get('message') as string;
 
     try {
-      const response = await fetch('https://formsubmit.co/ajax/mobac89@gmail.com', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      const result = await response.json();
-      console.log('FormSubmit Response:', result);
-
-      if (response.ok) {
-        setFormStatus('success');
-        form.reset();
-      } else {
-        setFormStatus('error');
-      }
+      await saveLead({ name, email, phone, message });
+      setFormStatus('success');
+      form.reset();
     } catch (error) {
-      console.error('Error submitting form:', error);
+      console.error('Error submitting form to Firebase:', error);
       setFormStatus('error');
     }
   };
@@ -534,7 +733,7 @@ export default function App() {
                 <span className="text-[10px] font-bold opacity-40 mb-6 md:mb-8 block tracking-[0.5em] uppercase">02 / היוצר</span>
                 <h2 className="text-4xl md:text-7xl font-black mb-8 md:mb-12 tracking-tighter break-words">היי, אני מוטי.</h2>
                 <div className="space-y-6 md:space-y-8 text-base md:text-lg font-light leading-relaxed max-w-2xl break-words w-full">
-                  <p className="text-lg md:text-xl font-bold leading-tight">אני מוביל את תחום עיצוב המוצר בחברת הייטק, בוגר המחלקה לארכיטקטורה בבצלאל, ויוצר פרויקטים שמחברים בין סיפור, ויזואליה וטכנולוגיה.</p>
+                  <p className="text-lg md:text-xl font-bold leading-tight">אני מוביל את תחום עיצוב המוצר בחברת הייטק, בוגר המחלקה לארכיטקטורה בבצלאל, ויוצר פרויקטים שמחברים בין סיפור, דימוי וטכנולוגיה.</p>
                   <p className="opacity-60">הקשר שלי עם אניטה פללי התחיל עוד כשהייתי בן 15 — אז נהגתי לחקות אותה. יותר מעשרים שנה אחר כך פגשתי אותה במקרה ברחוב בפלורנטין.</p>
                   <p className="opacity-60">המפגש הזה הוביל לקשר בינינו, לפתיחת עמוד אינסטגרם עבורה ולניסיון להחזיר את הסיפורים שלה לתודעה. כשניסיתי לספר רגעים שלא תועדו במצלמה, התחלתי להשתמש בכלי AI כדי לשחזר אותם.</p>
                   <p className="opacity-60">מתוך הניסיונות האלה התפתחה שיטה יצירתית שמאפשרת לקחת רגע — ולהפוך אותו לסצנה. <span className="opacity-100 font-bold">השיטה הזו היא הבסיס לקורס.</span></p>
@@ -848,8 +1047,8 @@ export default function App() {
                       animate={{ opacity: 1, scale: 1 }}
                       className="text-center py-12 md:py-20"
                     >
-                      <h3 className="text-3xl md:text-4xl font-black mb-4 md:mb-6 tracking-tighter">נשלח.</h3>
-                      <p className="text-lg md:text-xl font-light opacity-60">אחזור אליך בקרוב מאוד.</p>
+                      <h3 className="text-3xl md:text-4xl font-black mb-4 md:mb-6 tracking-tighter">איזה כיף!</h3>
+                      <p className="text-lg md:text-xl font-light opacity-60">אחזור אליך בקרוב עם פרטים נוספים עם הקורס.</p>
                       <div className="mt-6 flex justify-center">
                         <img 
                           src="https://i.postimg.cc/L8k9QLbM/glory.png" 
@@ -960,7 +1159,14 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-6 md:px-12">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <span className="text-xs md:text-sm font-black tracking-[0.2em] uppercase text-black break-words">איך לספר סיפורים עם AI</span>
-            <p className="text-[10px] font-bold opacity-30 tracking-[0.3em] uppercase break-words">© 2026 — כל הזכויות שמורות</p>
+            <p className="text-[10px] font-bold opacity-30 tracking-[0.3em] uppercase break-words flex items-center gap-2">
+              © 2026 — כל הזכויות שמורות
+              <button 
+                onClick={() => setIsAdminOpen(true)}
+                className="w-1 h-1 bg-black/10 rounded-full cursor-default"
+                aria-label="Admin"
+              />
+            </p>
           </div>
         </div>
       </footer>
@@ -982,6 +1188,20 @@ export default function App() {
               אני רוצה להירשם
               <ArrowLeft size={20} />
             </a>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Admin Dashboard Modal */}
+      <AnimatePresence>
+        {isAdminOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200]"
+          >
+            <AdminDashboard onClose={() => setIsAdminOpen(false)} />
           </motion.div>
         )}
       </AnimatePresence>
