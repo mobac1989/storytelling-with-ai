@@ -38,6 +38,8 @@ const AdminDashboard = ({ onClose }: { onClose: () => void }) => {
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthChange((u) => {
@@ -65,23 +67,29 @@ const AdminDashboard = ({ onClose }: { onClose: () => void }) => {
 
   const handleLogin = async () => {
     setIsAuthenticating(true);
+    setAuthError(null);
     try {
       await signInWithGoogle();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      setAuthError(error.message || 'שגיאה בהתחברות. אנא נסה שוב.');
     } finally {
       setIsAuthenticating(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('האם אתה בטוח שברצונך למחוק את הליד הזה?')) {
-      try {
-        await deleteLead(id);
-        setLeads(leads.filter(l => l.id !== id));
-      } catch (error) {
-        console.error(error);
-      }
+  const handleDelete = (id: string) => {
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmId) return;
+    try {
+      await deleteLead(deleteConfirmId);
+      setLeads(leads.filter(l => l.id !== deleteConfirmId));
+      setDeleteConfirmId(null);
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -114,6 +122,14 @@ const AdminDashboard = ({ onClose }: { onClose: () => void }) => {
           {isAuthenticating ? <RefreshCw className="animate-spin" size={20} /> : <Smile size={20} />}
           התחברות עם Google
         </button>
+        {authError && (
+          <div className="mt-6 p-4 bg-red-50 border border-red-200 text-red-600 text-sm font-medium max-w-md rounded-lg">
+            <p className="mb-2">שגיאה: {authError}</p>
+            <p className="text-[10px] opacity-70">
+              טיפ: וודא שהדומיין הנוכחי מוגדר כ-"Authorized Domain" בהגדרות ה-Authentication ב-Firebase Console.
+            </p>
+          </div>
+        )}
         {user && !ADMIN_EMAILS.includes(user.email || '') && (
           <p className="mt-6 text-red-500 font-bold">
             החשבון {user.email} אינו מורשה לגשת לדף זה.
@@ -129,7 +145,7 @@ const AdminDashboard = ({ onClose }: { onClose: () => void }) => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 border-b border-black/10 pb-8">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-[10px] font-bold tracking-[0.5em] uppercase opacity-40">Dashboard</span>
+              <span className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-40">איך לספר סיפורים עם AI</span>
               <div className="h-[1px] w-8 bg-black/20" />
             </div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tighter">ניהול לידים</h1>
@@ -137,10 +153,10 @@ const AdminDashboard = ({ onClose }: { onClose: () => void }) => {
           <div className="flex items-center gap-4">
             <button 
               onClick={fetchLeads}
-              className="p-3 bg-white border border-black/10 hover:border-neon-pink transition-colors rounded-full"
-              title="רענן"
+              className="px-6 py-3 bg-white border border-black font-bold hover:bg-black hover:text-white transition-all flex items-center gap-2"
             >
-              <RefreshCw size={20} />
+              <RefreshCw size={18} />
+              רענן
             </button>
             <button 
               onClick={logout}
@@ -151,7 +167,7 @@ const AdminDashboard = ({ onClose }: { onClose: () => void }) => {
             </button>
             <button 
               onClick={onClose}
-              className="p-3 bg-black text-white hover:bg-neon-pink transition-colors rounded-full"
+              className="p-3 bg-neon-pink text-white hover:bg-black transition-colors"
             >
               <X size={20} />
             </button>
@@ -173,7 +189,7 @@ const AdminDashboard = ({ onClose }: { onClose: () => void }) => {
               >
                 <button 
                   onClick={() => handleDelete(lead.id)}
-                  className="absolute top-6 left-6 p-2 text-black/20 hover:text-red-500 transition-colors"
+                  className="absolute top-6 left-6 p-2 text-black/20 hover:text-red-500 transition-colors z-20"
                   title="מחק ליד"
                 >
                   <Trash2 size={20} />
@@ -229,6 +245,45 @@ const AdminDashboard = ({ onClose }: { onClose: () => void }) => {
           )}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirmId && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white p-8 max-w-sm w-full text-center shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-neon-pink/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="text-neon-pink" size={32} />
+              </div>
+              <h3 className="text-2xl font-black mb-4 tracking-tighter">מחיקת ליד</h3>
+              <p className="text-lg font-light opacity-60 mb-8">האם אתה בטוח שברצונך למחוק את הליד הזה? פעולה זו אינה ניתנת לביטול.</p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="flex-1 py-4 bg-black/5 font-bold hover:bg-black/10 transition-colors"
+                >
+                  ביטול
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  className="flex-1 py-4 bg-neon-pink text-white font-bold hover:bg-black transition-colors"
+                >
+                  מחק
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -480,6 +535,25 @@ export default function App() {
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [showFloatingCTA, setShowFloatingCTA] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [footerClicks, setFooterClicks] = useState(0);
+  const clickTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleFooterClick = () => {
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+    }
+
+    const newClicks = footerClicks + 1;
+    if (newClicks >= 5) {
+      setIsAdminOpen(true);
+      setFooterClicks(0);
+    } else {
+      setFooterClicks(newClicks);
+      clickTimeoutRef.current = setTimeout(() => {
+        setFooterClicks(0);
+      }, 2000);
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -1159,13 +1233,11 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-6 md:px-12">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <span className="text-xs md:text-sm font-black tracking-[0.2em] uppercase text-black break-words">איך לספר סיפורים עם AI</span>
-            <p className="text-[10px] font-bold opacity-30 tracking-[0.3em] uppercase break-words flex items-center gap-2">
+            <p 
+              onClick={handleFooterClick}
+              className="text-[10px] font-bold opacity-30 tracking-[0.3em] uppercase break-words cursor-default select-none"
+            >
               © 2026 — כל הזכויות שמורות
-              <button 
-                onClick={() => setIsAdminOpen(true)}
-                className="w-1 h-1 bg-black/10 rounded-full cursor-default"
-                aria-label="Admin"
-              />
             </p>
           </div>
         </div>
